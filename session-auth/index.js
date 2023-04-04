@@ -5,16 +5,24 @@ const session = require("express-session");
 const app = express();
 app.use(cookieParser());
 app.use(session({
-  secret: 'YOUR_SESSION_SECRET_KEY',
+  secret: "YOUR_SECRET_KEY",
   resave: false,
   saveUninitialized: true,
+  cookie: {
+    httpOnly: true,
+    secure: false, // set to false due to testing on localhost
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
+  }
 }));
 
 const authorization = (req, res, next) => {
-  if (!req.session.userId) {
+  const userId = req.session.userId;
+  const userRole = req.session.userRole;
+
+  if (!userId || !userRole) {
     return res.sendStatus(403);
   }
-  req.userRole = req.session.userRole;
   return next();
 };
 
@@ -25,16 +33,18 @@ app.get("/", (req, res) => {
 app.get("/login", (req, res) => {
   req.session.userId = 7;
   req.session.userRole = "captain";
-  res.status(200).json({ message: "Logged in successfully 😊 👌" });
+  return res.status(200).json({ message: "Logged in successfully 😊 👌" });
 });
 
 app.get("/protected", authorization, (req, res) => {
-  res.json({ user: { id: req.session.userId, role: req.userRole } });
+  const userId = req.session.userId;
+  const userRole = req.session.userRole;
+  return res.json({ user: { id: userId, role: userRole } });
 });
 
 app.get("/logout", authorization, (req, res) => {
   req.session.destroy();
-  res.status(200).json({ message: "Successfully logged out 😏 🍀" });
+  return res.status(200).json({ message: "Successfully logged out 😏 🍀" });
 });
 
 const start = (port) => {

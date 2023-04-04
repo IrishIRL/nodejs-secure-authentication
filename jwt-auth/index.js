@@ -21,24 +21,25 @@ const authorization = (req, res, next) => {
 };
 
 app.get("/", (req, res) => {
-  res.json({ message: "Hello World 🇵🇹 🤘" });
+  return res.json({ message: "Hello World 🇵🇹 🤘" });
 });
 
 app.get("/login", (req, res) => {
   const token = jwt.sign({ id: 7, role: "captain" }, "YOUR_SECRET_KEY");
-  res.cookie("access_token", token, {
+  return res.cookie("access_token", token, {
     httpOnly: true,
-    sameSite: 'strict',
     secure: true,
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
   }).status(200).json({ message: "Logged in successfully 😊 👌" });
 });
 
 app.get("/protected", authorization, (req, res) => {
-  res.json({ user: { id: req.userId, role: req.userRole } });
+  return res.json({ user: { id: req.userId, role: req.userRole } });
 });
 
 app.get("/logout", authorization, (req, res) => {
-  res.clearCookie("access_token").status(200).json({ message: "Successfully logged out 😏 🍀" });
+  return res.clearCookie("access_token").status(200).json({ message: "Successfully logged out 😏 🍀" });
 });
 
 const start = (port) => {
