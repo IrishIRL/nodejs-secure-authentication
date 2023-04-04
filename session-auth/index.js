@@ -27,13 +27,13 @@ const authorization = (req, res, next) => {
 };
 
 app.get("/", (req, res) => {
-  res.json({ message: "Hello World 🇵🇹 🤘" });
+  res.json({ message: "Hello World!" });
 });
 
 app.get("/login", (req, res) => {
   req.session.userId = 7;
   req.session.userRole = "captain";
-  return res.status(200).json({ message: "Logged in successfully 😊 👌" });
+  return res.status(200).json({ message: "Logged in successfully." });
 });
 
 app.get("/protected", authorization, (req, res) => {
@@ -44,7 +44,7 @@ app.get("/protected", authorization, (req, res) => {
 
 app.get("/logout", authorization, (req, res) => {
   req.session.destroy();
-  return res.status(200).json({ message: "Successfully logged out 😏 🍀" });
+  return res.status(200).json({ message: "Successfully logged out." });
 });
 
 const start = (port) => {
