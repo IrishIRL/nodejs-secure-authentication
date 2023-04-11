@@ -1,8 +1,8 @@
 const uuid = require('uuid')
 
 const users = {
-    "user1": "password1",
-    "user2": "password2"
+    'user1': 'password1',
+    'user2': 'password2'
 }
 
 class Session {
@@ -47,15 +47,16 @@ const loginHandler = (req, res) => {
     // add the session information to the sessions map
     sessions[sessionToken] = session
 
-    // In the response, set a cookie on the client with the name "session_cookie"
-    // and the value as the UUID we generated. We also set the expiry time
-    res.cookie("session_token", sessionToken, {  
-	httpOnly: true,
-	secure: false, // set to false due to testing on localhost
-	sameSite: "strict",
-	expires: expiresAt
+    // In the response, set a cookie on the client with the name 'session_cookie'
+    // and the value as the UUID we generated. We also set the expiry time and 
+    // other security related attributes (HttpOnly, secure, sameSite)
+    res.cookie('sessionToken', sessionToken, {  
+		httpOnly: true,
+		secure: false, // set to false due to testing on localhost
+		sameSite: 'strict',
+		expires: expiresAt
     })
-    res.end()
+    res.send('Logged in.').end()
 }
 
 const welcomeHandler = (req, res) => {
@@ -67,7 +68,7 @@ const welcomeHandler = (req, res) => {
     }
 
     // We can obtain the session token from the requests cookies, which come with every request
-    const sessionToken = req.cookies['session_token']
+    const sessionToken = req.cookies['sessionToken']
     if (!sessionToken) {
         // If the cookie is not set, return an unauthorized status
         res.status(401).end()
@@ -102,7 +103,7 @@ const refreshHandler = (req, res) => {
         return
     }
 
-    const sessionToken = req.cookies['session_token']
+    const sessionToken = req.cookies['sessionToken']
     if (!sessionToken) {
         res.status(401).end()
         return
@@ -134,7 +135,12 @@ const refreshHandler = (req, res) => {
 
     // set the session token to the new value we generated, with a
     // renewed expiration time
-    res.cookie("session_token", newSessionToken, { expires: expiresAt })
+        res.cookie('sessionToken', newSessionToken, {  
+		httpOnly: true,
+		secure: false, // set to false due to testing on localhost
+		sameSite: 'strict',
+		expires: expiresAt
+    })
     res.end()
 }
 
@@ -144,7 +150,7 @@ const logoutHandler = (req, res) => {
         return
     }
 
-    const sessionToken = req.cookies['session_token']
+    const sessionToken = req.cookies['sessionToken']
     if (!sessionToken) {
         res.status(401).end()
         return
@@ -152,8 +158,8 @@ const logoutHandler = (req, res) => {
 
     delete sessions[sessionToken]
 
-    res.cookie("session_token", "", { expires: new Date() })
-    res.end()
+    res.cookie('sessionToken', '', { expires: new Date(0) })
+    res.send('Logged out.').end()
 }
 
 module.exports = {
