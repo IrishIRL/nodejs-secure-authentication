@@ -1,51 +1,17 @@
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const session = require("express-session");
+const express = require('express')
+const bodyParser = require('body-parser')
+const cookieParser = require('cookie-parser');
 
-const app = express();
-app.use(cookieParser());
-app.use(session({
-  secret: "YOUR_SECRET_KEY",
-  resave: false,
-  saveUninitialized: true,
-  cookie: {
-    httpOnly: true,
-    secure: false, // set to false due to testing on localhost
-    sameSite: "strict",
-    maxAge: 24 * 60 * 60 * 1000 // 1 day
-  }
-}));
+const { loginHandler, welcomeHandler, refreshHandler, logoutHandler } = require('./handlers')
 
-const authorization = (req, res, next) => {
-  const userId = req.session.userId;
-  const userRole = req.session.userRole;
+const app = express()
+app.use(bodyParser.json())
+app.use(cookieParser())
 
-  if (!userId || !userRole) {
-    return res.sendStatus(403);
-  }
-  return next();
-};
-
-app.get("/", (req, res) => {
-  res.json({ message: "Hello World!" });
-});
-
-app.get("/login", (req, res) => {
-  req.session.userId = 7;
-  req.session.userRole = "captain";
-  return res.status(200).json({ message: "Logged in successfully." });
-});
-
-app.get("/protected", authorization, (req, res) => {
-  const userId = req.session.userId;
-  const userRole = req.session.userRole;
-  return res.json({ user: { id: userId, role: userRole } });
-});
-
-app.get("/logout", authorization, (req, res) => {
-  req.session.destroy();
-  return res.status(200).json({ message: "Successfully logged out." });
-});
+app.post('/login', loginHandler)
+app.get('/welcome', welcomeHandler)
+app.post('/refresh', refreshHandler)
+app.get('/logout', logoutHandler)
 
 const start = (port) => {
   try {
