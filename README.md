@@ -1,39 +1,28 @@
 # PROJECT UNDER CONSTRUCTION
  Secure Authentication implementation for JWT and Session methods using cookies as a storage mechanism<br>
-
+ Projects could be run with NodeJS and verified with POSTMAN (Ready POSTMAN collections under "postman" folder).<br>
+ 
+ ## Session-based authentication
+ ### Login
+ TODO: Add different roles<br>
+ TODO: Move to DB<br>
+ ### Access protected page with POST
+ TODO: Maybe move the verification of session to another function.<br>
+ ### Refresh access token with POST
+ Done<br>
+ ### Logout page with POST
+ Done<br>
+ 
  ## JWT
- Currently there is only backend, so here are the commands to use for JWT auth
-
-### Login
-#### Login with GET
-http://localhost:3332/login?username=myusername&password=mypassword
-
-#### Login with POST 
-TODO: change login to POST
-```curl --request POST \
-  --url http://localhost:3332/login \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "username": "myusername",
-    "password": "mypassword"
-}'
-```
-
-### Access protected page with POST
-```
-curl -X POST http://localhost:3332/protected -H "Authorization: Bearer <access_token>"
-```
-
-### Refresh access token with POST
-TODO: Refresh both tokens, currently only AccessToken is refreshed
-```
-curl -X POST http://localhost:3332/refresh -H 'Content-Type: application/json' -H 'Cookie: refreshToken=<your-refresh-token>'
-```
-
-### Logout page with POST
-TODO: Remove both tokens<br>
-TODO: Add the logout tokens to DB or change secret
-
-```
-curl -X POST http://localhost:3332/logout -H 'Content-Type: application/json' -H 'Cookie: refreshToken=<your-refresh-token>'
-```
+ ### Login
+ TODO: Add different roles<br>
+ TODO: Move to DB<br>
+ TODO: Think how to make dynamic secrets<br>
+ ### Access protected page with POST
+ TODO: Maybe move the verification of token to another function.<br>
+ ### Refresh access token with POST
+ TODO: Decide upon refresh token renewal<br>
+ TODO: Current logic to take username from refresh token, probably should be rewritten<br>
+ TODO: Maybe store accesstoken id in refreshtoken?<br>
+ ### Logout page with POST
+ TODO: Create secure logout (secret revocation, adding db with revoked tokens)
