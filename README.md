@@ -1,4 +1,5 @@
-# PROJECT UNDER CONSTRUCTION
+# NodeJS Secure Authentication Implementations
+## PROJECT UNDER CONSTRUCTION
  Secure Authentication implementation for JWT and Session methods using cookies as a storage mechanism<br>
  Projects could be run with NodeJS and verified with POSTMAN (Ready POSTMAN collections under "postman" folder).<br>
  
