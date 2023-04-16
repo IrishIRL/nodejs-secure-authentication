@@ -5,10 +5,10 @@
  
  ## Session-based authentication
  ### Login
- TODO: Add different roles<br>
- TODO: Move to DB<br>
+ - [ ] Add different roles<br>
+ - [ ] Move to DB<br>
  ### Access protected page with POST
- TODO: Maybe move the verification of session to another function.<br>
+ - [ ] Maybe move the verification of session to another function.<br>
  ### Refresh access token with POST
  Done<br>
  ### Logout page with POST
@@ -16,14 +16,14 @@
  
  ## JWT
  ### Login
- TODO: Add different roles<br>
- TODO: Move to DB<br>
- TODO: Think how to make dynamic secrets<br>
+ - [x] Add different roles<br>
+ - [x] Move to DB<br>
+ - [ ] Think how to make dynamic secrets<br>
  ### Access protected page with POST
- TODO: Maybe move the verification of token to another function.<br>
+ - [ ] Maybe move the verification of token to another function.<br>
  ### Refresh access token with POST
- TODO: Decide upon refresh token renewal<br>
- TODO: Current logic to take username from refresh token, probably should be rewritten<br>
- TODO: Maybe store accesstoken id in refreshtoken?<br>
+ - [ ] Decide upon refresh token renewal<br>
+ - [ ] Current logic to take username from refresh token, probably should be rewritten<br>
+ - [ ] Maybe store accesstoken id in refreshtoken?<br>
  ### Logout page with POST
- TODO: Create secure logout (secret revocation, adding db with revoked tokens)
+ - [ ] Create secure logout (secret revocation, adding db with revoked tokens)
