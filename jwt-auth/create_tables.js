@@ -1,10 +1,11 @@
 const mysql = require('mysql');
+require('dotenv').config(); // Load environment variables from .env file
 
 const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '123456789',
-  database: 'mydb'
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE
 });
 
 connection.connect((err) => {
@@ -20,7 +21,7 @@ connection.connect((err) => {
   
   connection.query(createRolesTable, (err, result) => {
     if (err) throw err;
-    console.log('Created users table');
+    console.log('Created roles table');
   });
   
   // Create the users table
@@ -28,14 +29,14 @@ connection.connect((err) => {
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE,
-    password VARCHAR(255),
+    password VARCHAR(512),
     role_id INT,
     FOREIGN KEY (role_id) REFERENCES roles(role_id)
   )`;
 
   connection.query(createUsersTable, (err, result) => {
     if (err) throw err;
-    console.log('Created roles table');
+    console.log('Created users table');
   });
 });
 

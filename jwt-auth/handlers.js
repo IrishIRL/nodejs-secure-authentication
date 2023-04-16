@@ -1,16 +1,18 @@
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql');
 const crypto = require('crypto');
+const argon2 = require('argon2');
+require('dotenv').config(); // Load environment variables from .env file
 
 function generateTokenSecret() {
   return crypto.randomBytes(64).toString('hex');
 }
 
 const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '123456789',
-  database: 'mydb'
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE
 });
 
 connection.connect((err) => {
@@ -38,40 +40,51 @@ const loginHandler = (req, res) => {
                        FROM users 
                        INNER JOIN roles ON users.role_id = roles.role_id 
                        WHERE username = ? OR email = ?`;
-  connection.query(findUserQuery, [username, username], (err, result) => {
+  connection.query(findUserQuery, [username, username], async (err, result) => {
     if (err) {
       console.log(err);
       res.status(500).end();
       return;
     }
 
-    if (result.length === 0 || result[0].password !== password) {
+    if (result.length === 0) {
       res.status(401).end();
       return;
     }
 
-    const role_id = result[0].role_id;
-    const access_secret = result[0].secret; // maybe use different for access/ refresh
-    const refresh_secret = result[0].secret;
-    
-    const accessToken = generateAccessToken(username, role_id, access_secret);
-    const refreshToken = generateRefreshToken(username, role_id, refresh_secret);
+    const hashedPassword = result[0].password;
 
-    res.cookie('accessToken', accessToken, {  
-      httpOnly: true,
-      secure: false, // set to false due to testing on localhost
-      sameSite: 'strict',
-      expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
-    });
-  
-    res.cookie('refreshToken', refreshToken, {  
-      httpOnly: true,
-      secure: false, // set to false due to testing on localhost
-      sameSite: 'strict',
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
-    });
+    try {
+      if (await argon2.verify(hashedPassword, password)) {
+        const role_id = result[0].role_id;
+        const access_secret = result[0].secret; // maybe use different for access/ refresh
+        const refresh_secret = result[0].secret;
+        
+        const accessToken = generateAccessToken(username, role_id, access_secret);
+        const refreshToken = generateRefreshToken(username, role_id, refresh_secret);
 
-    res.send('Logged in.').end();
+        res.cookie('accessToken', accessToken, {  
+          httpOnly: true,
+          secure: false, // set to false due to testing on localhost
+          sameSite: 'strict',
+          expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
+        });
+      
+        res.cookie('refreshToken', refreshToken, {  
+          httpOnly: true,
+          secure: false, // set to false due to testing on localhost
+          sameSite: 'strict',
+          expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
+        });
+
+        res.send('Logged in.').end();
+      } else {
+        res.status(401).end();
+      }
+    } catch (err) {
+      console.log(err);
+      res.status(500).end();
+    }
   });
 };
 
@@ -136,7 +149,18 @@ const refreshHandler = (req, res) => {
           sameSite: 'strict',
           expires: new Date(Date.now() + 5 * 60 * 1000), // expires in 5 minutes
         });
+        
+        // Generate a new refresh token using the retrieved secret
+        const refreshToken = generateRefreshToken(req.username, req.role_id, secret);
 
+        // Set the access token cookie with the new token
+        res.cookie('refreshToken', refreshToken, {  
+          httpOnly: true,
+          secure: false, // set to false due to testing on localhost
+          sameSite: 'strict',
+          expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
+        });
+        
         // Send the new access token in the response
         //res.json({ accessToken }).end();
         res.send('Refreshed.').end();
