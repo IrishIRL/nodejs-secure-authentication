@@ -1,19 +1,29 @@
 const jwt = require('jsonwebtoken');
+const mysql = require('mysql');
+const crypto = require('crypto');
 
-const users = {
-  'user1': 'password1',
-  'user2': 'password2'
+function generateTokenSecret() {
+  return crypto.randomBytes(64).toString('hex');
+}
+
+const connection = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: '123456789',
+  database: 'mydb'
+});
+
+connection.connect((err) => {
+  if (err) throw err;
+  console.log('Connected to MySQL database');
+});
+
+const generateAccessToken = (username, role_id, access_token_secret) => {
+  return jwt.sign({ username, role_id }, access_token_secret, { expiresIn: '5m' });
 };
 
-const ACCESS_TOKEN_SECRET = 'your_access_token_secret';
-const REFRESH_TOKEN_SECRET = 'your_refresh_token_secret';
-
-const generateAccessToken = (username) => {
-  return jwt.sign({ username }, ACCESS_TOKEN_SECRET, { expiresIn: '5m' });
-};
-
-const generateRefreshToken = (username) => {
-  return jwt.sign({ username }, REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
+const generateRefreshToken = (username, role_id, refresh_token_secret) => {
+  return jwt.sign({ username, role_id }, refresh_token_secret, { expiresIn: "7d" });
 };
 
 const loginHandler = (req, res) => {
@@ -23,32 +33,46 @@ const loginHandler = (req, res) => {
     res.status(401).end();
     return;
   }
-
-  const expectedPassword = users[username];
-
-  if (!expectedPassword || expectedPassword !== password) {
-    res.status(401).end();
-    return;
-  }
-
-  const accessToken = generateAccessToken(username);
-  const refreshToken = generateRefreshToken(username);
-
-  res.cookie('accessToken', accessToken, {  
-    httpOnly: true,
-    secure: false, // set to false due to testing on localhost
-    sameSite: 'strict',
-    expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
-  });
   
-  res.cookie('refreshToken', refreshToken, {  
-    httpOnly: true,
-    secure: false, // set to false due to testing on localhost
-    sameSite: 'strict',
-    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
-  });
+  const findUserQuery = `SELECT users.password, roles.role_name, roles.role_id, roles.secret 
+                       FROM users 
+                       INNER JOIN roles ON users.role_id = roles.role_id 
+                       WHERE username = ? OR email = ?`;
+  connection.query(findUserQuery, [username, username], (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).end();
+      return;
+    }
 
-  res.send('Logged in.').end();
+    if (result.length === 0 || result[0].password !== password) {
+      res.status(401).end();
+      return;
+    }
+
+    const role_id = result[0].role_id;
+    const access_secret = result[0].secret; // maybe use different for access/ refresh
+    const refresh_secret = result[0].secret;
+    
+    const accessToken = generateAccessToken(username, role_id, access_secret);
+    const refreshToken = generateRefreshToken(username, role_id, refresh_secret);
+
+    res.cookie('accessToken', accessToken, {  
+      httpOnly: true,
+      secure: false, // set to false due to testing on localhost
+      sameSite: 'strict',
+      expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
+    });
+  
+    res.cookie('refreshToken', refreshToken, {  
+      httpOnly: true,
+      secure: false, // set to false due to testing on localhost
+      sameSite: 'strict',
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
+    });
+
+    res.send('Logged in.').end();
+  });
 };
 
 const welcomeHandler = (req, res) => {
@@ -58,12 +82,25 @@ const welcomeHandler = (req, res) => {
     return res.sendStatus(403);
   }
   try {
-    const data = jwt.verify(token, ACCESS_TOKEN_SECRET);
-    req.username = data.username;
+    const data = jwt.decode(token);
+    const role_id = data.role_id;
+
+    const findRoleQuery = `SELECT secret FROM roles WHERE role_id = ?`;
+    connection.query(findRoleQuery, [role_id], (err, result) => {
+      if (err || result.length === 0) {
+        return res.sendStatus(403);
+      }
+      const secret = result[0].secret;
+      try {
+        jwt.verify(token, secret);
+        return res.json({ user: { username: data.username, role_id: role_id } });
+      } catch (err) {
+        return res.sendStatus(403);
+      }
+    });
   } catch (err) {
     return res.sendStatus(403);
   }
-  return res.json({ user: { username: req.username } });
 };
 
 const refreshHandler = (req, res) => {
@@ -72,25 +109,44 @@ const refreshHandler = (req, res) => {
   if (!token) {
     return res.sendStatus(403);
   }
+
   try {
-    const data = jwt.verify(token, REFRESH_TOKEN_SECRET);
+    const data = jwt.decode(token);
     req.username = data.username;
+    req.role_id = data.role_id;
+
+    const findRoleQuery = `SELECT secret FROM roles WHERE role_id = ?`;
+    connection.query(findRoleQuery, [req.role_id], (err, result) => {
+      if (err || result.length === 0) {
+        return res.sendStatus(403);
+      }
+
+      const secret = result[0].secret;
+
+      try {
+        jwt.verify(token, secret);
+
+        // Generate a new access token using the retrieved secret
+        const accessToken = generateAccessToken(req.username, req.role_id, secret);
+
+        // Set the access token cookie with the new token
+        res.cookie('accessToken', accessToken, {
+          httpOnly: true,
+          secure: false, // set to false due to testing on localhost
+          sameSite: 'strict',
+          expires: new Date(Date.now() + 5 * 60 * 1000), // expires in 5 minutes
+        });
+
+        // Send the new access token in the response
+        //res.json({ accessToken }).end();
+        res.send('Refreshed.').end();
+      } catch (err) {
+        return res.sendStatus(403);
+      }
+    });
   } catch (err) {
     return res.sendStatus(403);
   }
-
-  res.clearCookie('accessToken');
-  
-  const accessToken = generateAccessToken(req.username);
-
-  res.cookie('accessToken', accessToken, {  
-    httpOnly: true,
-    secure: false, // set to false due to testing on localhost
-    sameSite: 'strict',
-    expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
-  });
-  
-  res.json({ accessToken }).end();
 };
 
 const logoutHandler = (req, res) => {
@@ -102,9 +158,25 @@ const logoutHandler = (req, res) => {
     return;
   }
 
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
-  res.send('Logged out.').end();
+  // Get user's role_id from access token
+  const data = jwt.decode(accessToken);
+  const role_id = data.role_id;
+
+  // Generate new secret for user's role and update database
+  const newSecret = generateTokenSecret();
+  const updateRoleQuery = `UPDATE roles SET secret = ? WHERE role_id = ?`;
+  connection.query(updateRoleQuery, [newSecret, role_id], (err, result) => {
+    if (err) {
+      console.error(err);
+      res.status(500).end();
+      return;
+    }
+
+    // Clear cookies and send response
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    res.send('Logged out.').end();
+  });
 };
 
 module.exports = {
