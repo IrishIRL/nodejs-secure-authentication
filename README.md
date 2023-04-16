@@ -19,6 +19,8 @@
  - [x] Add different roles<br>
  - [x] Move to DB<br>
  - [ ] Think how to make dynamic secrets<br>
+ - [ ] Add hashing of passwords
+ - [ ] Add password hash to secret 
  ### Access protected page with POST
  - [ ] Maybe move the verification of token to another function.<br>
  ### Refresh access token with POST
