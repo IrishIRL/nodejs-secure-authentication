@@ -5,10 +5,12 @@
  
  ## Session-based authentication
  ### Login
- - [ ] Add different roles<br>
- - [ ] Move to DB<br>
+ - [X] Move to DB
+ - [X] Add hashing of passwords
+ - [ ] Add different roles (added, but not used anywhere)
  ### Access protected page with POST
- - [ ] Maybe move the verification of session to another function.<br>
+ - [ ] Maybe move the verification of session to another function.
+ - [ ] Get some data from db?
  ### Refresh access token with POST
  Done<br>
  ### Logout page with POST
