@@ -1,9 +1,7 @@
 const uuid = require('uuid')
-
-const users = {
-    'user1': 'password1',
-    'user2': 'password2'
-}
+const mysql = require('mysql');
+const argon2 = require('argon2');
+require('dotenv').config(); // Load environment variables from .env file
 
 class Session {
     constructor(username, expiresAt) {
@@ -16,132 +14,149 @@ class Session {
     }
 }
 
+const connection = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE
+});
+
+const cookieSettings = {
+  httpOnly: true,
+  secure: false, // set to false due to testing on localhost
+  sameSite: 'strict'
+};
+
+const sessionCookieSettings = {
+  ...cookieSettings,
+  expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
+};
+
 const sessions = {}
 
 const loginHandler = (req, res) => {
-    // get users credentials from the JSON body
-    const { username, password } = req.body // query
-    if (!username) {
-        // If the username isn't present, return an HTTP unauthorized code
-        res.status(401).end()
-        return
+  const { username, password } = req.body;
+
+  if (!username) {
+    res.status(401).end();
+    return;
+  }
+  
+  const findUserQuery = `SELECT users.password, roles.role_name, roles.role_id 
+                       FROM users 
+                       INNER JOIN roles ON users.role_id = roles.role_id 
+                       WHERE username = ? OR email = ?`;
+  connection.query(findUserQuery, [username, username], async (err, result) => {
+    if (err) {
+      console.log(err);
+      res.status(500).end();
+      return;
     }
 
-    // validate the password against our data
-    // if invalid, send an unauthorized code
-    const expectedPassword = users[username]
-    if (!expectedPassword || expectedPassword !== password) {
-        res.status(401).end()
-        return
+    if (result.length === 0) {
+      res.status(401).end();
+      return;
     }
 
-    // generate a random UUID as the session token
-    const sessionToken = uuid.v4()
+    const hashedPassword = result[0].password;
 
-    // set the expiry time as 120s after the current time
-    const now = new Date()
-    const expiresAt = new Date(+now + 120 * 1000)
+    try {
+      if (await argon2.verify(hashedPassword, password)) {   
+        // generate a random UUID as the session token
+        const sessionToken = uuid.v4();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+        const session = new Session(username, expiresAt);
+        sessions[sessionToken] = session;
 
-    // create a session containing information about the user and expiry time
-    const session = new Session(username, expiresAt)
-    // add the session information to the sessions map
-    sessions[sessionToken] = session
-
-    // In the response, set a cookie on the client with the name 'session_cookie'
-    // and the value as the UUID we generated. We also set the expiry time and 
-    // other security related attributes (HttpOnly, secure, sameSite)
-    res.cookie('sessionToken', sessionToken, {  
-		httpOnly: true,
-		secure: false, // set to false due to testing on localhost
-		sameSite: 'strict',
-		expires: expiresAt
-    })
-    res.send('Logged in.').end()
-}
+        res.cookie('sessionToken', sessionToken, sessionCookieSettings);
+        res.send('Logged in.').end();
+      } else {
+        res.status(401).end();
+      }
+    } catch (err) {
+      console.log(err);
+      res.status(500).end();
+    }
+  });
+};
 
 const welcomeHandler = (req, res) => {
     // if this request doesn't have any cookies, that means it isn't
     // authenticated. Return an error code.
     if (!req.cookies) {
-        res.status(401).end()
+        res.status(401).end();
         return
     }
 
-    // We can obtain the session token from the requests cookies, which come with every request
-    const sessionToken = req.cookies['sessionToken']
+    // We can obtain the session token from the requests cookies, which come with every
+    // request
+    const sessionToken = req.cookies['sessionToken'];
     if (!sessionToken) {
         // If the cookie is not set, return an unauthorized status
-        res.status(401).end()
+        res.status(401).end();
         return
     }
 
     // We then get the session of the user from our session map
     // that we set in the loginHandler
-    userSession = sessions[sessionToken]
+    userSession = sessions[sessionToken];
     if (!userSession) {
         // If the session token is not present in session map, return an unauthorized error
-        res.status(401).end()
+        res.status(401).end();
         return
     }
     // if the session has expired, return an unauthorized error, and delete the 
     // session from our map
     if (userSession.isExpired()) {
-        delete sessions[sessionToken]
-        res.status(401).end()
+        delete sessions[sessionToken];
+        res.status(401).end();
         return
     }
 
     // If all checks have passed, we can consider the user authenticated and
     // send a welcome message
-    res.send(`Welcome  ${userSession.username}!`).end()
+    res.send(`Welcome  ${userSession.username}!`).end();
 }
 
 const refreshHandler = (req, res) => {
     // (BEGIN) The code from this point is the same as the first part of the welcomeHandler
     if (!req.cookies) {
-        res.status(401).end()
+        res.status(401).end();
         return
     }
 
-    const sessionToken = req.cookies['sessionToken']
+    const sessionToken = req.cookies['sessionToken'];
     if (!sessionToken) {
-        res.status(401).end()
+        res.status(401).end();
         return
     }
 
-    userSession = sessions[sessionToken]
+    userSession = sessions[sessionToken];
     if (!userSession) {
-        res.status(401).end()
+        res.status(401).end();
         return
     }
     if (userSession.isExpired()) {
-        delete sessions[sessionToken]
-        res.status(401).end()
+        delete sessions[sessionToken];
+        res.status(401).end();
         return
     }
     // (END) The code until this point is the same as the first part of the welcomeHandler
 
     // create a new session token
-    const newSessionToken = uuid.v4()
+    const newSessionToken = uuid.v4();
 
     // renew the expiry time
-    const now = new Date()
-    const expiresAt = new Date(+now + 120 * 1000)
-    const session = new Session(userSession.username, expiresAt)
+    const now = new Date();
+    const expiresAt = new Date(+now + 120 * 1000);
+    const session = new Session(userSession.username, expiresAt);
 
     // add the new session to our map, and delete the old session
-    sessions[newSessionToken] = session
-    delete sessions[sessionToken]
+    sessions[newSessionToken] = session;
+    delete sessions[sessionToken];
 
-    // set the session token to the new value we generated, with a
-    // renewed expiration time
-        res.cookie('sessionToken', newSessionToken, {  
-		httpOnly: true,
-		secure: false, // set to false due to testing on localhost
-		sameSite: 'strict',
-		expires: expiresAt
-    })
-    res.end()
+    res.cookie('sessionToken', newSessionToken, sessionCookieSettings);
+    res.send('Refreshed.').end();
 }
 
 const logoutHandler = (req, res) => {
