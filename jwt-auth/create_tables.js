@@ -11,7 +11,7 @@ const connection = mysql.createConnection({
 connection.connect((err) => {
   if (err) throw err;
   console.log('Connected to MySQL database');
-    
+  
   // Create the roles table
   const createRolesTable = `CREATE TABLE roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -26,7 +26,7 @@ connection.connect((err) => {
   
   // Create the users table
   const createUsersTable = `CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE,
     password VARCHAR(512),
@@ -38,5 +38,17 @@ connection.connect((err) => {
     if (err) throw err;
     console.log('Created users table');
   });
-});
+  
+  // Create the refreshTokens table
+  const createRefreshTokensTable = `CREATE TABLE refreshTokens (
+    uuid VARCHAR(255) PRIMARY KEY,
+    expiration_date VARCHAR(255) UNIQUE,
+    user_id INT,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+  )`;
 
+  connection.query(createRefreshTokensTable, (err, result) => {
+    if (err) throw err;
+    console.log('Created refreshTokens table');
+  });
+});
