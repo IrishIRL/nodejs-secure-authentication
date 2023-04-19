@@ -9,46 +9,57 @@ const connection = mysql.createConnection({
 });
 
 connection.connect((err) => {
-  if (err) throw err;
+  if (err) {
+    console.error('Error connecting to database:', err);
+    return;
+  }
   console.log('Connected to MySQL database');
   
-  // Create the roles table
-  const createRolesTable = `CREATE TABLE roles (
-    role_id INT AUTO_INCREMENT PRIMARY KEY,
-    role_name VARCHAR(255),
+  // Create the userGroups table
+  const createUserGroupsTable = `CREATE TABLE IF NOT EXISTS userGroups (
+    groupId INT AUTO_INCREMENT PRIMARY KEY,
     secret VARCHAR(255)
   )`;
   
-  connection.query(createRolesTable, (err, result) => {
-    if (err) throw err;
-    console.log('Created roles table');
+  connection.query(createUserGroupsTable, (err, result) => {
+    if (err) {
+      console.error('Error creating userGroups table:', err);
+      return;
+    }
+    console.log('Created userGroups table');
   });
   
   // Create the users table
-  const createUsersTable = `CREATE TABLE users (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
+  const createUsersTable = `CREATE TABLE IF NOT EXISTS users (
+    userId INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE,
     password VARCHAR(512),
-    role_id INT,
-    FOREIGN KEY (role_id) REFERENCES roles(role_id)
+    groupId INT,
+    FOREIGN KEY (groupId) REFERENCES userGroups(groupId)
   )`;
 
   connection.query(createUsersTable, (err, result) => {
-    if (err) throw err;
+    if (err) {
+      console.error('Error creating users table:', err);
+      return;
+    }
     console.log('Created users table');
   });
   
   // Create the refreshTokens table
-  const createRefreshTokensTable = `CREATE TABLE refreshTokens (
+  const createRefreshTokensTable = `CREATE TABLE IF NOT EXISTS refreshTokens (
     uuid VARCHAR(255) PRIMARY KEY,
-    expiration_date VARCHAR(255) UNIQUE,
-    user_id INT,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    expirationDate DATETIME UNIQUE,
+    userId INT,
+    FOREIGN KEY (userId) REFERENCES users(userId)
   )`;
 
   connection.query(createRefreshTokensTable, (err, result) => {
-    if (err) throw err;
-    console.log('Created refreshTokens table');
+  if (err) {
+      console.error('Error creating refreshTokens table:', err);
+      return;
+    }
+  console.log('Created refreshTokens table');
   });
 });

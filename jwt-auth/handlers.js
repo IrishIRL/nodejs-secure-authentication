@@ -19,29 +19,57 @@ const connection = mysql.createConnection({
   database: process.env.DB_DATABASE
 });
 
+connection.connect((err) => {
+  if (err) throw err;
+  console.log('Connected to MySQL database');
+});
+
+function insertRefreshToken(uuid, expirationDate, userId, connection, callback) {
+  const insertTokenQuery = "INSERT INTO refreshTokens (uuid, expirationDate, userId) VALUES (?, ?, ?)";
+  connection.query(insertTokenQuery, [uuid, expirationDate, userId], (err, result) => {
+    if (err) {
+      console.log(err);
+      callback(err);
+    } else {
+      callback(null, result);
+    }
+  });
+}
+
+function deleteRefreshToken(token, connection, callback) {
+  const deleteTokenQuery = `DELETE FROM refreshTokens WHERE uuid = ?`;
+  connection.query(deleteTokenQuery, [token], (err, result) => {
+    if (err) {
+      console.log(err);
+      callback(err);
+    } else {
+      callback(null, result);
+    }
+  });
+}
+
 const cookieSettings = {
   httpOnly: true,
   secure: false, // set to false due to testing on localhost
   sameSite: 'strict'
 };
 
-const accessTokenCookieSettings = {
-  ...cookieSettings,
-  expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
+const getAccessTokenCookieSettings = () => {
+  return {
+    ...cookieSettings,
+    expires: new Date(Date.now() + 5 * 60 * 1000) // expires in 5 minutes
+  };
 };
 
-const refreshTokenCookieSettings = {
-  ...cookieSettings,
-  expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
+const getRefreshTokenCookieSettings = () => {
+  return {
+    ...cookieSettings,
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expires in 30 days
+  };
 };
 
-connection.connect((err) => {
-  if (err) throw err;
-  console.log('Connected to MySQL database');
-});
-
-const generateAccessToken = (username, role_id, access_token_secret) => {
-  return jwt.sign({ username, role_id }, access_token_secret, { expiresIn: '5m' });
+const generateAccessToken = (username, groupId, accessTokenSecret) => {
+  return jwt.sign({ username, groupId }, accessTokenSecret, { expiresIn: '5m' });
 };
 
 const loginHandler = (req, res) => {
@@ -52,9 +80,9 @@ const loginHandler = (req, res) => {
     return;
   }
   
-  const findUserQuery = `SELECT users.user_id, users.password, roles.role_name, roles.role_id, roles.secret 
+  const findUserQuery = `SELECT users.userId, users.password, userGroups.groupId, userGroups.secret 
                        FROM users 
-                       INNER JOIN roles ON users.role_id = roles.role_id 
+                       INNER JOIN userGroups ON users.groupId = userGroups.groupId 
                        WHERE username = ? OR email = ?`;
   connection.query(findUserQuery, [username, username], async (err, result) => {
     if (err) {
@@ -72,29 +100,27 @@ const loginHandler = (req, res) => {
 
     try {
       if (await argon2.verify(hashedPassword, password)) {
-        const user_id = result[0].user_id;
-        const role_id = result[0].role_id;
-        const access_secret = result[0].secret;
+        const userId = result[0].userId;
+        const groupId = result[0].groupId;
+        const accessTokenSecret = result[0].secret;
         const uuid = generateRandomUUID();
         const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         
-        // INSERT NEW TOKEN TO REFRESHTOKENS HERE
-        var insertToken = "INSERT INTO refreshTokens (uuid, expiration_date, user_id) VALUES (?, ?, ?)";
-        connection.query(insertToken, [uuid, expirationDate, user_id], (err, result) => {
+        insertRefreshToken(uuid, expirationDate, userId, connection, (err, result) => {
           if (err) {
-            console.log(err);
             res.status(500).end();
-            return;
+          } else {
+            const accessTokenCookieSettings = getAccessTokenCookieSettings();
+            const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
+        
+            const accessToken = generateAccessToken(username, groupId, accessTokenSecret); 
+
+            res.cookie('accessToken', accessToken, accessTokenCookieSettings);
+            res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
+        
+            res.send('Logged in.').end();
           }
         });
-        // INSERT NEW TOKEN TO REFRESHTOKENS HERE
-    
-        const accessToken = generateAccessToken(username, role_id, access_secret); 
-
-        res.cookie('accessToken', accessToken, accessTokenCookieSettings);
-        res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
-        
-        res.send('Logged in.').end();
       } else {
         res.status(401).end();
       }
@@ -113,17 +139,17 @@ const welcomeHandler = (req, res) => {
   }
   try {
     const data = jwt.decode(token);
-    const role_id = data.role_id;
+    const groupId = data.groupId;
 
-    const findRoleQuery = `SELECT secret FROM roles WHERE role_id = ?`;
-    connection.query(findRoleQuery, [role_id], (err, result) => {
+    const findGroupQuery = `SELECT secret FROM userGroups WHERE groupId = ?`;
+    connection.query(findGroupQuery, [groupId], (err, result) => {
       if (err || result.length === 0) {
         return res.sendStatus(403);
       }
       const secret = result[0].secret;
       try {
         jwt.verify(token, secret);
-        return res.json({ user: { username: data.username, role_id: role_id } });
+        return res.json({ user: { username: data.username, groupId: groupId } });
       } catch (err) {
         return res.sendStatus(403);
       }
@@ -137,49 +163,58 @@ const refreshHandler = (req, res) => {
   const token = req.cookies.refreshToken;
 
   if (!token) {
-    return res.sendStatus(401);
+    return res.sendStatus(403);
   }
 
   try {
-    const findUserInfoQuery = `SELECT users.user_id, users.username, roles.role_id, roles.secret
+    const findUserInfoQuery = `SELECT users.userId, users.username, userGroups.groupId, userGroups.secret, refreshTokens.expirationDate
     FROM refreshTokens
-    INNER JOIN users ON refreshTokens.user_id = users.user_id
-    INNER JOIN roles ON users.role_id = roles.role_id
+    INNER JOIN users ON refreshTokens.userId = users.userId
+    INNER JOIN userGroups ON users.groupId = userGroups.groupId
     WHERE refreshTokens.uuid = ?`;
     connection.query(findUserInfoQuery, [token], (err, result) => {
       if (err || result.length === 0) {
-        return res.sendStatus(402);
+        return res.sendStatus(403);
       }
 
       try {
         const user = result[0];
-        console.log(user);
+        const userId = user.userId;
+        var nowDate = new Date();
+        var expirationDateFromDatabase = user.expirationDate;
+        
+        // Verify that UUID is not yet expired
+        if (nowDate.getTime() > expirationDateFromDatabase.getTime()) {
+          // If expired, we can safely remove UUID from DB
+          deleteRefreshToken(token, connection, (err, result) => {
+            if (err) {
+              res.status(500).end();
+            }
+          });
+
+          return res.sendStatus(403);
+        }
+        
         // Generate a new access token using retreived secret
-        const accessToken = generateAccessToken(user.username, user.role_id, user.secret);
+        const accessToken = generateAccessToken(user.username, user.groupId, user.secret);
         
         const uuid = generateRandomUUID();
         const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        
-        // DELETE PREVIOUS REFRESH TOKEN
-        const deleteQuery = `DELETE FROM refreshTokens WHERE uuid = ?`;
-        connection.query(deleteQuery, [token], (err, result) => {
-          if (err || result.affectedRows === 0) {
-            console.log(err);
-            return res.sendStatus(403);
-          }
-        });
-        // DELETE PREVIOUS REFRESH TOKEN
-        // INSERT NEW REFRESH TOKEN
-        var insertToken = "INSERT INTO refreshTokens (uuid, expiration_date, user_id) VALUES (?, ?, ?)";
-        connection.query(insertToken, [uuid, expirationDate, user.user_id], (err, result) => {
+    
+        deleteRefreshToken(token, connection, (err, result) => {
           if (err) {
-            console.log(err);
             res.status(500).end();
-            return;
           }
         });
-        // INSERT NEW REFRESH TOKEN
 
+        insertRefreshToken(uuid, expirationDate, userId, connection, (err, result) => {
+          if (err) {
+            res.status(500).end();
+          }
+        });
+        
+        const accessTokenCookieSettings = getAccessTokenCookieSettings();
+        const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
         res.cookie('accessToken', accessToken, accessTokenCookieSettings);
         res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
         
@@ -191,7 +226,7 @@ const refreshHandler = (req, res) => {
     });
   } catch (err) {
     console.log(err);
-    return res.sendStatus(404);
+    return res.sendStatus(403);
   }
 };
 
@@ -204,30 +239,27 @@ const logoutHandler = (req, res) => {
     return;
   }
 
-  // Get user's role_id from access token
+  // Get user's groupId from access token
   const data = jwt.decode(accessToken);
-  const role_id = data.role_id;
+  const groupId = data.groupId;
 
-  // Generate new secret for user's role and update database
+  // Generate new secret for user's group and update database
   const newSecret = generateTokenSecret();
-  const updateRoleQuery = `UPDATE roles SET secret = ? WHERE role_id = ?`;
-  connection.query(updateRoleQuery, [newSecret, role_id], (err, result) => {
+  const updateGroupQuery = `UPDATE userGroups SET secret = ? WHERE groupId = ?`;
+  connection.query(updateGroupQuery, [newSecret, groupId], (err, result) => {
     if (err) {
       console.error(err);
       res.status(500).end();
       return;
     }
-  
-   // DELETE PREVIOUS REFRESH TOKEN
-   const deleteQuery = `DELETE FROM refreshTokens WHERE uuid = ?`;
-   connection.query(deleteQuery, [refreshToken], (err, result) => {
-      if (err || result.affectedRows === 0) {
-        console.log(err);
-        return res.sendStatus(403);
+
+    // Delete previous refresh token
+    deleteRefreshToken(token, connection, (err, result) => {
+      if (err) {
+        res.status(500).end();
       }
     });
-    // DELETE PREVIOUS REFRESH TOKEN
-        
+
     // Clear cookies and send response
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');

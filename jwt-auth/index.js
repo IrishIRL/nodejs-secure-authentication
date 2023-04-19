@@ -11,7 +11,7 @@ app.use(cookieParser());
 app.post('/login', loginHandler);
 app.get('/welcome', welcomeHandler);
 app.post('/refresh', refreshHandler);
-app.get('/logout', logoutHandler);
+app.post('/logout', logoutHandler);
 
 const start = (port) => {
   try {
@@ -25,6 +25,6 @@ const start = (port) => {
 };
 
 const portArgIndex = process.argv.indexOf('-p');
-const port = portArgIndex !== -1 ? process.argv[portArgIndex + 1] : 3332;
+const port = portArgIndex !== -1 ? process.argv[portArgIndex + 1] : 3331;
 
 start(port);

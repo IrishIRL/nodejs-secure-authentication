@@ -18,17 +18,17 @@ pool.getConnection((err, connection) => {
   if (err) throw err;
   console.log('Connected to MySQL database');
 
-  const newRoles = [
-    { role_name: 'user', secret: generateTokenSecret() },
-    { role_name: 'admin', secret: generateTokenSecret() }
+  const newUserGroups = [
+    { secret: generateTokenSecret() },
+    { secret: generateTokenSecret() }
   ];
 
-  const values = newRoles.map(r => [r.role_name, r.secret]);
-  const sql = 'INSERT INTO roles (role_name, secret) VALUES ?';
+  const values = newUserGroups.map(r => [r.secret]);
+  const sql = 'INSERT INTO userGroups (secret) VALUES ?';
 
   connection.query(sql, [values], (err, result) => {
     if (err) throw err;
-    console.log(`${result.affectedRows} new roles inserted`);
+    console.log(`${result.affectedRows} new userGroups inserted`);
     connection.release();
   });
 });
