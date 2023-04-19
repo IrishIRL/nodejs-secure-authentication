@@ -7,12 +7,12 @@
  ### Login
  - [X] Move to DB
  - [X] Add hashing of passwords
- - [ ] Add different groups (not currently in use, are they even needed?)
+ - [X] Move sessions to DB
  ### Access protected page with POST
  - [ ] Maybe move the verification of session to another function.
  - [ ] Get some data from db?
  ### Refresh access token with POST
- - [ ] Decide upon where to store sessions?
+ - [X] Decide and implement upon where to store sessions
  ### Logout page with POST
  Done<br>
  
@@ -22,7 +22,7 @@
  - [x] Move to DB
  - [X] Move database variables to .env file 
  - [X] Add hashing of passwords
- - [ ] Decide upon adding password hash to secret 
+ - [X] Decide and implement adding password hash to secret 
  ### Access protected page
  - [ ] Maybe move the verification of token to another function
  ### Refresh access token

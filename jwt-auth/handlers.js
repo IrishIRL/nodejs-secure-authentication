@@ -91,8 +91,7 @@ const loginHandler = async (req, res) => {
   const { username, password } = req.body;
 
   if (!username) {
-    res.status(401).end();
-    return;
+    return res.status(401).end();
   }
   
   try {
@@ -107,8 +106,7 @@ const loginHandler = async (req, res) => {
     });
 
     if (result.length === 0) {
-      res.status(401).end();
-      return;
+      return res.status(401).end();
     }
 
     const hashedPassword = result[0].password;
@@ -122,7 +120,7 @@ const loginHandler = async (req, res) => {
       
       insertRefreshToken(uuid, expirationDate, userId, (err, result) => {
         if (err) {
-          res.status(500).end();
+          return res.status(500).end();
         } else {
           const accessTokenCookieSettings = getAccessTokenCookieSettings();
           const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
@@ -132,15 +130,15 @@ const loginHandler = async (req, res) => {
           res.cookie('accessToken', accessToken, accessTokenCookieSettings);
           res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
       
-          res.send('Logged in.').end();
+          return res.status(200).send('Logged in.').end();
         }
       });
     } else {
-      res.status(401).end();
+      return res.status(401).end();
     }
   } catch (err) {
     console.log(err);
-    res.status(500).end();
+    return res.status(500).end();
   }
 };
 
@@ -157,7 +155,7 @@ const welcomeHandler = (req, res) => {
     
     findUserByUsername(username, (err, result) => {
       if (err) {
-        res.status(500).end();
+        return res.status(500).end();
       }
     
       const hashedPassword = result[0].password;
@@ -167,7 +165,7 @@ const welcomeHandler = (req, res) => {
       return res.json({ user: { username: data.username, groupId: groupId } });
     });
   } catch (err) {
-    return res.sendStatus(403);
+    return res.sendStatus(403).end();
   }
 };
 
@@ -175,7 +173,7 @@ const refreshHandler = (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {
-    return res.sendStatus(403);
+    return res.sendStatus(403).end();
   }
 
   try {
@@ -186,7 +184,7 @@ const refreshHandler = (req, res) => {
     WHERE refreshTokens.uuid = ?`;
     connection.query(findUserInfoQuery, [refreshToken], (err, result) => {
       if (err || result.length === 0) {
-        return res.sendStatus(403);
+        return res.sendStatus(403).end();
       }
 
       const userId = result[0].userId;
@@ -198,10 +196,10 @@ const refreshHandler = (req, res) => {
         // If expired, we can safely remove UUID from DB
         deleteRefreshToken(refreshToken, (err, result) => {
           if (err) {
-            res.status(500).end();
+            return res.status(500).end();
           }
         });
-        return res.sendStatus(403);
+        return res.sendStatus(403).end();
       }
 
       // Generate a new access token using retreived secret
@@ -217,14 +215,14 @@ const refreshHandler = (req, res) => {
       // Delete previous refresh token
       deleteRefreshToken(refreshToken, (err, result) => {
         if (err) {
-          res.status(500).end();
+          return res.status(500).end();
         }
       });
 
       // Insert new refresh token
       insertRefreshToken(uuid, expirationDate, userId, (err, result) => {
         if (err) {
-          res.status(500).end();
+          return res.status(500).end();
         }
       });
         
@@ -233,7 +231,7 @@ const refreshHandler = (req, res) => {
       res.cookie('accessToken', accessToken, accessTokenCookieSettings);
       res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
         
-      res.send('Refreshed.').end();
+      return res.status(200).send('Refreshed.').end();
     });
   } catch (err) {
     console.log(err);
@@ -246,8 +244,7 @@ const logoutHandler = (req, res) => {
   const refreshToken = req.cookies['refreshToken'];
   
   if (!accessToken && !refreshToken) {
-    res.status(401).end();
-    return;
+    return res.status(401).end();
   }
   
   if (accessToken) {
@@ -261,8 +258,7 @@ const logoutHandler = (req, res) => {
     connection.query(updateGroupQuery, [newGroupSecret, groupId], (err, result) => {
       if (err) {
         console.error(err);
-        res.status(500).end();
-        return;
+        return res.status(500).end();
       }
     });
     
@@ -273,14 +269,14 @@ const logoutHandler = (req, res) => {
     // Delete previous refresh token
     deleteRefreshToken(refreshToken, (err, result) => {
       if (err) {
-        res.status(500).end();
+        return res.status(500).end();
       }
     });
     
     res.clearCookie('refreshToken');
   }
 
-  res.send('Logged out.').end();
+  return res.send('Logged out.').end();
 };
 
 module.exports = {
