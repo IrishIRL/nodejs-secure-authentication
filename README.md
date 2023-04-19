@@ -7,18 +7,18 @@
  ### Login
  - [X] Move to DB
  - [X] Add hashing of passwords
- - [ ] Add different roles (added, but not used anywhere)
+ - [ ] Add different groups (not currently in use, are they even needed?)
  ### Access protected page with POST
  - [ ] Maybe move the verification of session to another function.
  - [ ] Get some data from db?
  ### Refresh access token with POST
- Done<br>
+ - [ ] Decide upon where to store sessions?
  ### Logout page with POST
  Done<br>
  
  ## JWT
  ### Login
- - [x] Add different roles
+ - [x] Add different groups
  - [x] Move to DB
  - [X] Move database variables to .env file 
  - [X] Add hashing of passwords
@@ -31,7 +31,8 @@
  - [X] Final decision: refreshToken is now uuid and saved in DB
  ### Logout page
  - [X] Implement secret revocation
- - [ ] Decide upon refresh tokens storaging
+ - [X] Decide and implement upon refresh tokens storaging
  ### Other
  - [ ] refreshToken DB has expiration dates of tokens, they should be cleared when time comes
- - [ ] Enhance visual part of the code, too many repetative queries. 
+ - [X] Enhance visual part of the code, too many repetative queries.
+ - [ ] Further enhance visual part of the code. 
