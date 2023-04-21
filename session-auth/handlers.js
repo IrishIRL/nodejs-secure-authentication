@@ -3,8 +3,32 @@ const crypto = require('crypto');
 const argon2 = require('argon2');
 require('dotenv').config(); // Load environment variables from .env file
 
-function generateRandomUUID() {
-  return crypto.randomUUID();
+function generateRandomUUID(callback) {
+  let uuid = crypto.randomUUID();
+  let attempts = 0;
+  
+  function checkUUID() {
+    uuidExists(uuid, (err, exists) => {
+      if (err) {
+        console.error('Error checking if UUID exists:', err);
+        return callback(err, null);
+      }
+      if (exists) {
+        // UUID already exists, generate a new one
+        uuid = crypto.randomUUID();
+        attempts++;
+        if (attempts >= 10) {
+          console.error('Error generating UUID: too many attempts');
+          return callback(new Error('Unable to generate unique UUID'), null);
+        }
+        checkUUID();
+      } else {
+        // UUID doesn't exist, return it
+        callback(null, uuid);
+      }
+    });
+  }
+  checkUUID();
 }
 
 class Session {
@@ -37,6 +61,17 @@ const sessionCookieSettings = {
 };
 
 const sessions = {}
+
+const uuidExists = (uuid, callback) => {
+  const query = 'SELECT sessionId FROM sessions WHERE sessionId = ? LIMIT 1';
+  connection.query(query, [uuid], (err, results) => {
+    if (err) {
+      console.error('Error checking if UUID exists:', err);
+      return callback(err, null);
+    }
+    callback(null, results.length > 0);
+  });
+};
 
 const createSession = (sessionId, userId, expiresAt, callback) => {
   const insertQuery = `
@@ -100,19 +135,23 @@ const loginHandler = (req, res) => {
 
     try {
       if (await argon2.verify(hashedPassword, password)) {
-        const uuid = generateRandomUUID();
-        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-        
-        createSession(uuid, result[0].userId, expiresAt, (err, result) => {
+        generateRandomUUID((err, uuid) => {
           if (err) {
-            console.log(err);
-            return res.status(500).send('Internal server error').end();
+            return callback({status: 500, message: 'Internal server error'});
           }
 
-          res.cookie('sessionToken', uuid, sessionCookieSettings);
-          res.send('Logged in.').end();
-        });
+          const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         
+          createSession(uuid, result[0].userId, expiresAt, (err, result) => {
+            if (err) {
+              console.log(err);
+              return res.status(500).send('Internal server error').end();
+            }
+
+            res.cookie('sessionToken', uuid, sessionCookieSettings);
+            res.send('Logged in.').end();
+          });
+        });
       } else {
         return res.status(401).end();
       }
@@ -122,154 +161,61 @@ const loginHandler = (req, res) => {
     }
   });
 };
-/*
-const welcomeHandler = (req, res) => {
-    // if this request doesn't have any cookies, that means it isn't
-    // authenticated. Return an error code.
-    if (!req.cookies) {
-        res.status(401).end();
-        return
-    }
-
-    // We can obtain the session token from the requests cookies, which come with every
-    // request
-    const sessionToken = req.cookies['sessionToken'];
-    if (!sessionToken) {
-        // If the cookie is not set, return an unauthorized status
-        res.status(401).end();
-        return
-    }
-
-    // We then get the session of the user from our session map
-    // that we set in the loginHandler
-    userSession = sessions[sessionToken];
-    if (!userSession) {
-        // If the session token is not present in session map, return an unauthorized error
-        res.status(401).end();
-        return
-    }
-    // if the session has expired, return an unauthorized error, and delete the 
-    // session from our map
-    if (userSession.isExpired()) {
-        delete sessions[sessionToken];
-        res.status(401).end();
-        return
-    }
-
-    // If all checks have passed, we can consider the user authenticated and
-    // send a welcome message
-    res.send(`Welcome  ${userSession.userId}!`).end();
-}*/
 
 const welcomeHandler = (req, res) => {
-  const sessionToken = req.cookies['sessionToken'];
-  
-  if (!sessionToken) {
-    return res.status(401).send('Session cookie not found').end();
-  }
-
-  getSession(sessionToken, (err, session) => {
+  // Whenever the site authenticates the user, it also regenerates 
+  // and resends the session cookie.
+  refreshHandler(req, (err, newUUID, userId) => {
     if (err) {
-      console.log(err);
-      return res.status(500).send('Internal server error').end();
+      return res.status(err.status).send(err.message).end();
     }
-
-    if (!session) {
-      return res.status(401).send('Session not found').end();
-    }
-
-    if (session.isExpired()) {
-      deleteSession(sessionToken, (err) => {
-        if (err) {
-          console.log(err);
-        }
-      });
-      return res.status(401).send('Session expired').end();
-    }
-
-    return res.status(200).send(`Welcome ${session.userId}!`).end();
+    res.cookie('sessionToken', newUUID, sessionCookieSettings);
+    return res.status(200).send(`Welcome ${userId}!`).end();
   });
 };
-/*
-const refreshHandler = (req, res) => {
-    // (BEGIN) The code from this point is the same as the first part of the welcomeHandler
-    if (!req.cookies) {
-        res.status(401).end();
-        return
-    }
 
-    const sessionToken = req.cookies['sessionToken'];
-    if (!sessionToken) {
-        res.status(401).end();
-        return
-    }
-
-    userSession = sessions[sessionToken];
-    if (!userSession) {
-        res.status(401).end();
-        return
-    }
-    if (userSession.isExpired()) {
-        delete sessions[sessionToken];
-        res.status(401).end();
-        return
-    }
-    // (END) The code until this point is the same as the first part of the welcomeHandler
-
-    // create a new session token
-    const newUUID = generateRandomUUID();
-
-    // renew the expiry time
-    const now = new Date();
-    const expiresAt = new Date(+now + 120 * 1000);
-    const session = new Session(userSession.userId, expiresAt);
-
-    // add the new session to our map, and delete the old session
-    sessions[newUUID] = session;
-    delete sessions[sessionToken];
-
-    res.cookie('sessionToken', newUUID, sessionCookieSettings);
-    res.send('Refreshed.').end();
-}*/
-
-const refreshHandler = (req, res) => {
+const refreshHandler = (req, callback) => {
   const sessionToken = req.cookies['sessionToken'];
   if (!sessionToken) {
-    return res.status(401).send('Session cookie not found').end();
+    return callback({status: 401, message: 'Session cookie not found'});
   }
 
   getSession(sessionToken, (err, session) => {
     if (err) {
-      return res.status(500).send('Internal server error').end();
+      return callback({status: 500, message: 'Internal server error'});
     }
 
     if (!session) {
-      return res.status(401).send('Session not found').end();
+      return callback({status: 401, message: 'Session not found'});
     }
 
     if (session.isExpired()) {
       deleteSession(sessionToken, (err) => {
         if (err) {
-          return res.status(500).send('Internal server error').end();
+          return callback({status: 500, message: 'Internal server error'});
         }
-        return res.status(401).send('Session expired').end();
+        return callback({status: 401, message: 'Session expired'});
       });
-      return res.status(401).end();
+      return;
     }
 
-    const newUUID = generateRandomUUID();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    
-    createSession(newUUID, session.userId, expiresAt, (err) => {
+    generateRandomUUID((err, newUUID) => {
       if (err) {
-        return res.status(500).send('Internal server error').end();
+        return callback({status: 500, message: 'Internal server error'});
       }
-      deleteSession(sessionToken, (err) => {
+
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+      createSession(newUUID, session.userId, expiresAt, (err) => {
         if (err) {
-          return res.status(500).send('Internal server error').end();
+          return callback({status: 500, message: 'Internal server error'});
         }
-        res.cookie('sessionToken', newUUID, sessionCookieSettings);
-        res.send('Refreshed.').end();
+        deleteSession(sessionToken, (err) => {
+          if (err) {
+            return callback({status: 500, message: 'Internal server error'});
+          }
+          callback(null, newUUID, session.userId);
+        });
       });
     });
   });
@@ -301,4 +247,3 @@ module.exports = {
     refreshHandler,
     logoutHandler
 }
-
