@@ -51,7 +51,7 @@ const connection = mysql.createConnection({
 
 const cookieSettings = {
   httpOnly: true,
-  secure: false, // set to false due to testing on localhost
+  secure: true, // set to false due to testing on localhost
   sameSite: 'strict'
 };
 

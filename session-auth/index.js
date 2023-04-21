@@ -2,16 +2,15 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 
-const { loginHandler, welcomeHandler, refreshHandler, logoutHandler } = require('./handlers');
+const { loginHandler, welcomeHandler, logoutHandler } = require('./handlers');
 
 const app = express();
 app.use(bodyParser.json());
 app.use(cookieParser());
 
 app.post('/login', loginHandler);
-app.get('/welcome', welcomeHandler);
-app.post('/refresh', refreshHandler);
-app.get('/logout', logoutHandler);
+app.post('/welcome', welcomeHandler);
+app.post('/logout', logoutHandler);
 
 const start = (port) => {
   try {
