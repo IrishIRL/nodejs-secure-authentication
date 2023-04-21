@@ -12,7 +12,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"username\": \"user1\",\r\n    \"password\": \"password1\"\r\n}",
+					"raw": "{\r\n    \"username\": \"user2\",\r\n    \"password\": \"password2\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -20,7 +20,7 @@
 					}
 				},
 				"url": {
-					"raw": "http://192.168.233.128:3333/login",
+					"raw": "http://192.168.233.128:3332/login",
 					"protocol": "http",
 					"host": [
 						"192",
@@ -28,7 +28,7 @@
 						"233",
 						"128"
 					],
-					"port": "3333",
+					"port": "3332",
 					"path": [
 						"login"
 					]
@@ -40,10 +40,10 @@
 		{
 			"name": "http://192.168.233.128:3333/welcome",
 			"request": {
-				"method": "GET",
+				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "http://192.168.233.128:3333/welcome",
+					"raw": "http://192.168.233.128:3332/welcome",
 					"protocol": "http",
 					"host": [
 						"192",
@@ -51,7 +51,7 @@
 						"233",
 						"128"
 					],
-					"port": "3333",
+					"port": "3332",
 					"path": [
 						"welcome"
 					]
@@ -61,12 +61,12 @@
 			"response": []
 		},
 		{
-			"name": "http://192.168.233.128:3333/refresh",
+			"name": "http://192.168.233.128:3333/logout",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "http://192.168.233.128:3333/refresh",
+					"raw": "http://192.168.233.128:3332/logout",
 					"protocol": "http",
 					"host": [
 						"192",
@@ -74,30 +74,7 @@
 						"233",
 						"128"
 					],
-					"port": "3333",
-					"path": [
-						"refresh"
-					]
-				},
-				"description": "Refresh page for Session-based website"
-			},
-			"response": []
-		},
-		{
-			"name": "http://192.168.233.128:3333/logout",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://192.168.233.128:3333/logout",
-					"protocol": "http",
-					"host": [
-						"192",
-						"168",
-						"233",
-						"128"
-					],
-					"port": "3333",
+					"port": "3332",
 					"path": [
 						"logout"
 					]

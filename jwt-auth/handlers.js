@@ -252,6 +252,7 @@ const logoutHandler = (req, res) => {
     const data = jwt.decode(accessToken);
     const groupId = data.groupId;
     
+    // TODO: Maybe verify that the token is correct.
     // Generate new secret for user's group and update database
     const newGroupSecret = generateGroupSecret();
     const updateGroupQuery = `UPDATE userGroups SET secret = ? WHERE groupId = ?`;
@@ -273,6 +274,7 @@ const logoutHandler = (req, res) => {
       }
     });
     
+    // TODO: change accessToken secret
     res.clearCookie('refreshToken');
   }
 

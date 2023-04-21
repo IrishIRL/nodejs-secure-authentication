@@ -8,11 +8,13 @@
  - [X] Move to DB
  - [X] Add hashing of passwords
  - [X] Move sessions to DB
+ - [X] Fix the possibility of creating sessionId that already exists (on the creation level).
  ### Access protected page with POST
  - [ ] Maybe move the verification of session to another function.
  - [ ] Get some data from db?
  ### Refresh access token with POST
  - [X] Decide and implement upon where to store sessions
+ - [X] Fix session fixation vulnerability
  ### Logout page with POST
  Done<br>
  
@@ -22,7 +24,8 @@
  - [x] Move to DB
  - [X] Move database variables to .env file 
  - [X] Add hashing of passwords
- - [X] Decide and implement adding password hash to secret 
+ - [X] Decide and implement adding password hash to secret
+ - [ ] Fix the possibility of creating sessionId that already exists (on the creation level).
  ### Access protected page
  - [ ] Maybe move the verification of token to another function
  ### Refresh access token
@@ -32,6 +35,8 @@
  ### Logout page
  - [X] Implement secret revocation
  - [X] Decide and implement upon refresh tokens storaging
+ - [ ] In case there is only a refresh token, acces token secret will not be revoked
+ - [ ] Verify that the refreshToken is correct
  ### Other
  - [ ] refreshToken DB has expiration dates of tokens, they should be cleared when time comes
  - [X] Enhance visual part of the code, too many repetative queries.

@@ -9,7 +9,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 app.post('/login', loginHandler);
-app.get('/welcome', welcomeHandler);
+app.post('/welcome', welcomeHandler);
 app.post('/refresh', refreshHandler);
 app.post('/logout', logoutHandler);
 
