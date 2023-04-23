@@ -36,6 +36,38 @@ function generateRandomUUID(callback) {
   checkUUID();
 }
 
+const verifyAccessToken = (req, accessToken) => {
+  return new Promise((resolve, reject) => {
+    
+    if (!accessToken) {
+      reject({ statusCode: 401, message: 'Unauthorized' });
+    } else {
+      try {
+        const data = jwt.decode(accessToken);
+        const username = data.username;
+        const groupId = data.groupId;
+        findUserByUsername(username, (err, result) => {
+          if (err) {
+            reject({ statusCode: 500, message: 'Internal server error' });
+          } else {
+            const hashedPassword = result[0].password;
+            const secret = result[0].secret + hashedPassword;
+            jwt.verify(accessToken, secret, (err, decoded) => {
+              if (err) {
+                reject({ statusCode: 401, message: 'Unauthorized' });
+              } else {
+                resolve(decoded);
+              }
+            });
+          }
+        });
+      } catch (err) {
+        reject({ statusCode: 401, message: 'Unauthorized' });
+      }
+    }
+  });
+};
+
 const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -181,30 +213,14 @@ const loginHandler = async (req, res) => {
   }
 };
 
-const welcomeHandler = (req, res) => {
+const welcomeHandler = async (req, res) => {
   const accessToken = req.cookies.accessToken;
-
-  if (!accessToken) {
-    return res.sendStatus(403);
-  }
   try {
-    const data = jwt.decode(accessToken);
-    const username = data.username;
-    const groupId = data.groupId;
-    
-    findUserByUsername(username, (err, result) => {
-      if (err) {
-        return res.status(500).send('Internal server error').end();
-      }
-    
-      const hashedPassword = result[0].password;
-      const secret = result[0].secret + hashedPassword;
-      
-      jwt.verify(accessToken, secret);
-      return res.json({ user: { username: data.username, groupId: groupId } });
-    });
+    const decoded = await verifyAccessToken(req, accessToken);
+    // code to handle successful authentication
+    res.status(200).send(`Welcome ${decoded.username}!`);
   } catch (err) {
-    return res.sendStatus(403).end();
+    res.status(err.statusCode).send(err.message);
   }
 };
 
@@ -283,7 +299,7 @@ const refreshHandler = (req, res) => {
   }
 };
 
-const logoutHandler = (req, res) => {
+const logoutHandler = async (req, res) => {
   const accessToken = req.cookies['accessToken'];
   const refreshToken = req.cookies['refreshToken'];
   
@@ -292,21 +308,21 @@ const logoutHandler = (req, res) => {
   }
   
   if (accessToken) {
-    // Get user's groupId from access token
-    const data = jwt.decode(accessToken);
-    const groupId = data.groupId;
-    
-    // TODO: Maybe verify that the token is correct.
-    // Generate new secret for user's group and update database
-    const newGroupSecret = generateGroupSecret();
-    const updateGroupQuery = `UPDATE userGroups SET secret = ? WHERE groupId = ?`;
-    connection.query(updateGroupQuery, [newGroupSecret, groupId], (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).send('Internal server error').end();
-      }
-    });
-    
+    // Verify that the token is correct to mitigate possible DoS attacks.
+    try {
+      const decoded = await verifyAccessToken(req, accessToken);
+      // Generate new secret for user's group and update database
+      const newGroupSecret = generateGroupSecret();
+      const updateGroupQuery = `UPDATE userGroups SET secret = ? WHERE groupId = ?`;
+      connection.query(updateGroupQuery, [newGroupSecret, decoded.groupId], (err, result) => {
+        if (err) {
+          return res.status(500).send('Internal server error').end();
+        }
+      });
+    } catch (err) {
+      // We do not want to set status here, as it will be changed later.
+      // res.status(err.statusCode).send(err.message);
+    }
     res.clearCookie('accessToken');
   }
   
@@ -318,11 +334,11 @@ const logoutHandler = (req, res) => {
       }
     });
     
-    // TODO: change accessToken secret
+    // TODO: change accessToken secret?
     res.clearCookie('refreshToken');
   }
 
-  return res.send('Logged out.').end();
+  return res.status(200).send('Logged out.').end();
 };
 
 module.exports = {

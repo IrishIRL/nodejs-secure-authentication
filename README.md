@@ -17,7 +17,9 @@
  - [X] Fix session fixation vulnerability
  ### Logout page with POST
  Done<br>
- 
+ ### Other
+  - [X] WON'T DO: refreshToken DB has expiration dates of tokens, they should be cleared when time comes
+  
  ## JWT
  ### Login
  - [x] Add different groups
@@ -27,7 +29,7 @@
  - [X] Decide and implement adding password hash to secret
  - [X] Fix the possibility of creating refreshTokenUUID that already exists (on the creation level).
  ### Access protected page
- - [ ] Maybe move the verification of token to another function
+ - [X] Move the verification of token to another function
  ### Refresh access token
  - [X] Decide upon refresh token renewal
  - [X] Current logic to take username from refresh token, probably should be rewritten
@@ -35,9 +37,11 @@
  ### Logout page
  - [X] Implement secret revocation
  - [X] Decide and implement upon refresh tokens storaging
- - [ ] In case there is only a refresh token, acces token secret will not be revoked
- - [ ] Verify that the refreshToken is correct
+ - [X] AccessToken revocation does not verify that the token is correct, possibility for DoS
+ - [ ] In case there is only a refresh token, acces token secret is not be revoked. Decide if it is needed to be revoked.
  ### Other
- - [ ] refreshToken DB has expiration dates of tokens, they should be cleared when time comes
  - [X] Enhance visual part of the code, too many repetative queries.
- - [ ] Further enhance visual part of the code. 
+ - [ ] Further enhance visual part of the code.
+ 
+ - [X] WON'T DO: refreshToken DB has expiration dates of tokens, they should be cleared when time comes
+ 
