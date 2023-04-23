@@ -25,7 +25,7 @@
  - [X] Move database variables to .env file 
  - [X] Add hashing of passwords
  - [X] Decide and implement adding password hash to secret
- - [ ] Fix the possibility of creating sessionId that already exists (on the creation level).
+ - [X] Fix the possibility of creating refreshTokenUUID that already exists (on the creation level).
  ### Access protected page
  - [ ] Maybe move the verification of token to another function
  ### Refresh access token

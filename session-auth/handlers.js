@@ -149,7 +149,7 @@ const loginHandler = (req, res) => {
             }
 
             res.cookie('sessionToken', uuid, sessionCookieSettings);
-            res.send('Logged in.').end();
+            res.status(200).send('Logged in.').end();
           });
         });
       } else {
@@ -237,7 +237,7 @@ const logoutHandler = (req, res) => {
         return res.status(500).send('Internal server error').end();
       }
       res.cookie('sessionToken', '', { expires: new Date(0) });
-      res.send('Logged out.').end();
+      res.status(200).send('Logged out.').end();
     });
 }
 

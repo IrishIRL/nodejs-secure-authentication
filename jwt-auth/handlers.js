@@ -8,8 +8,32 @@ function generateGroupSecret() {
   return crypto.randomBytes(64).toString('hex');
 }
 
-function generateRandomUUID() {
-  return crypto.randomUUID();
+function generateRandomUUID(callback) {
+  let uuid = crypto.randomUUID();
+  let attempts = 0;
+  
+  function checkUUID() {
+    uuidExists(uuid, (err, exists) => {
+      if (err) {
+        console.error('Error checking if UUID exists:', err);
+        return callback(err, null);
+      }
+      if (exists) {
+        // UUID already exists, generate a new one
+        uuid = crypto.randomUUID();
+        attempts++;
+        if (attempts >= 10) {
+          console.error('Error generating UUID: too many attempts');
+          return callback(new Error('Unable to generate unique UUID'), null);
+        }
+        checkUUID();
+      } else {
+        // UUID doesn't exist, return it
+        callback(null, uuid);
+      }
+    });
+  }
+  checkUUID();
 }
 
 const connection = mysql.createConnection({
@@ -23,6 +47,17 @@ connection.connect((err) => {
   if (err) throw err;
   console.log('Connected to MySQL database');
 });
+
+const uuidExists = (uuid, callback) => {
+  const query = 'SELECT uuid FROM refreshTokens WHERE uuid = ? LIMIT 1';
+  connection.query(query, [uuid], (err, results) => {
+    if (err) {
+      console.error('Error checking if UUID exists:', err);
+      return callback(err, null);
+    }
+    callback(null, results.length > 0);
+  });
+};
 
 async function findUserByUsername(username, callback) {
   const findUserQuery = `SELECT users.userId, users.password, userGroups.groupId, userGroups.secret 
@@ -65,7 +100,7 @@ function deleteRefreshToken(token, callback) {
 
 const cookieSettings = {
   httpOnly: true,
-  secure: false, // set to false due to testing on localhost
+  secure: true,
   sameSite: 'strict'
 };
 
@@ -115,30 +150,34 @@ const loginHandler = async (req, res) => {
       const userId = result[0].userId;
       const groupId = result[0].groupId;
       const accessTokenSecret = result[0].secret + hashedPassword;        
-      const uuid = generateRandomUUID();
-      const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      //const uuid = generateRandomUUID();
       
-      insertRefreshToken(uuid, expirationDate, userId, (err, result) => {
-        if (err) {
-          return res.status(500).end();
-        } else {
-          const accessTokenCookieSettings = getAccessTokenCookieSettings();
-          const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
-      
-          const accessToken = generateAccessToken(username, groupId, accessTokenSecret); 
+      generateRandomUUID((err, uuid) => {
+          if (err) {
+            return callback({status: 500, message: 'Internal server error'});
+          }
+          const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-          res.cookie('accessToken', accessToken, accessTokenCookieSettings);
-          res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
+          insertRefreshToken(uuid, expirationDate, userId, (err, result) => {
+            if (err) {
+              return res.status(500).send('Internal server error').end();
+            }
+            const accessTokenCookieSettings = getAccessTokenCookieSettings();
+            const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
       
-          return res.status(200).send('Logged in.').end();
-        }
+            const accessToken = generateAccessToken(username, groupId, accessTokenSecret);
+
+            res.cookie('accessToken', accessToken, accessTokenCookieSettings);
+            res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
+            return res.status(200).send('Logged in.').end();
+        });
       });
     } else {
       return res.status(401).end();
     }
   } catch (err) {
     console.log(err);
-    return res.status(500).end();
+    return res.status(500).send('Internal server error').end();
   }
 };
 
@@ -155,7 +194,7 @@ const welcomeHandler = (req, res) => {
     
     findUserByUsername(username, (err, result) => {
       if (err) {
-        return res.status(500).end();
+        return res.status(500).send('Internal server error').end();
       }
     
       const hashedPassword = result[0].password;
@@ -196,7 +235,7 @@ const refreshHandler = (req, res) => {
         // If expired, we can safely remove UUID from DB
         deleteRefreshToken(refreshToken, (err, result) => {
           if (err) {
-            return res.status(500).end();
+            return res.status(500).send('Internal server error').end();
           }
         });
         return res.sendStatus(403).end();
@@ -209,29 +248,34 @@ const refreshHandler = (req, res) => {
       const groupId = result[0].groupId;
       const accessToken = generateAccessToken(username, groupId, secret);
 
-      const uuid = generateRandomUUID();
-      const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-      // Delete previous refresh token
-      deleteRefreshToken(refreshToken, (err, result) => {
+      //const uuid = generateRandomUUID();
+      generateRandomUUID((err, uuid) => {
         if (err) {
-          return res.status(500).end();
+          return callback({status: 500, message: 'Internal server error'});
         }
-      });
+        const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-      // Insert new refresh token
-      insertRefreshToken(uuid, expirationDate, userId, (err, result) => {
-        if (err) {
-          return res.status(500).end();
-        }
+        // Delete previous refresh token
+        deleteRefreshToken(refreshToken, (err, result) => {
+          if (err) {
+            return res.status(500).send('Internal server error').end();
+          }
+        });
+
+        // Insert new refresh token
+        insertRefreshToken(uuid, expirationDate, userId, (err, result) => {
+          if (err) {
+            return res.status(500).send('Internal server error').end();
+          }
+        });
+      
+        const accessTokenCookieSettings = getAccessTokenCookieSettings();
+        const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
+        res.cookie('accessToken', accessToken, accessTokenCookieSettings);
+        res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
+        
+        return res.status(200).send('Refreshed.').end();
       });
-        
-      const accessTokenCookieSettings = getAccessTokenCookieSettings();
-      const refreshTokenCookieSettings = getRefreshTokenCookieSettings();
-      res.cookie('accessToken', accessToken, accessTokenCookieSettings);
-      res.cookie('refreshToken', uuid, refreshTokenCookieSettings);
-        
-      return res.status(200).send('Refreshed.').end();
     });
   } catch (err) {
     console.log(err);
@@ -259,7 +303,7 @@ const logoutHandler = (req, res) => {
     connection.query(updateGroupQuery, [newGroupSecret, groupId], (err, result) => {
       if (err) {
         console.error(err);
-        return res.status(500).end();
+        return res.status(500).send('Internal server error').end();
       }
     });
     
@@ -270,7 +314,7 @@ const logoutHandler = (req, res) => {
     // Delete previous refresh token
     deleteRefreshToken(refreshToken, (err, result) => {
       if (err) {
-        return res.status(500).end();
+        return res.status(500).send('Internal server error').end();
       }
     });
     
