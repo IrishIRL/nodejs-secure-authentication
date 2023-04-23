@@ -33,12 +33,12 @@ function generateRandomUUID(callback) {
 
 class Session {
     constructor(userId, expiresAt) {
-        this.userId = userId
-        this.expiresAt = expiresAt
+        this.userId = userId;
+        this.expiresAt = expiresAt;
     }
 
     isExpired() {
-        this.expiresAt < (new Date())
+        this.expiresAt < (new Date());
     }
 }
 
@@ -51,7 +51,7 @@ const connection = mysql.createConnection({
 
 const cookieSettings = {
   httpOnly: true,
-  secure: true, // set to false due to testing on localhost
+  secure: true,
   sameSite: 'strict'
 };
 
