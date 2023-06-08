@@ -1,5 +1,4 @@
 # NodeJS Secure Authentication Implementations
-## PROJECT UNDER CONSTRUCTION
  Secure Authentication implementation for JWT and Session methods using cookies as a storage mechanism<br>
  Projects could be run with NodeJS and verified with POSTMAN (Ready POSTMAN collections under "postman" folder).<br>
  
@@ -10,8 +9,7 @@
  - [X] Move sessions to DB
  - [X] Fix the possibility of creating sessionId that already exists (on the creation level).
  ### Access protected page with POST
- - [ ] Maybe move the verification of session to another function.
- - [ ] Get some data from db?
+ - [X] Move the verification of session to another function.
  ### Refresh access token with POST
  - [X] Decide and implement upon where to store sessions
  - [X] Fix session fixation vulnerability
@@ -38,10 +36,9 @@
  - [X] Implement secret revocation
  - [X] Decide and implement upon refresh tokens storaging
  - [X] AccessToken revocation does not verify that the token is correct, possibility for DoS
- - [ ] In case there is only a refresh token, acces token secret is not be revoked. Decide if it is needed to be revoked.
+ - [X] Futher improve revocation logic.
  ### Other
  - [X] Enhance visual part of the code, too many repetative queries.
- - [ ] Further enhance visual part of the code.
- 
+ - [X] Further enhance visual part of the code.
  - [X] WON'T DO: refreshToken DB has expiration dates of tokens, they should be cleared when time comes
  
